@@ -1,46 +1,71 @@
 const {response} = require('express');
+const User = require('../models/user');
+const bcryptjs = require('bcryptjs');
 
-const users_GET = (req, res = response) => {
-    const {query} = req
+const getUsers = async(req, res = response) => {
+	const {query} = req;
+	const userActive = {status: true}
+
+	const [total, users] = await Promise.all([
+		User.countDocuments(userActive),
+		User.find(userActive)
+			.skip(query.skipTo)
+			.limit(query.limit)
+	])
 	res.json({
-		msj: 'GET api - controlador',
-        query
+		total,
+		users
 	});
 };
 
-const users_POST = (req, res = response) => {
-    const {nombre, edad} = req.body
-	res.json({
-        msg: 'Hola',
-        nombre,
-        edad
-    });
-};
+const createUser = async (req, res = response) => {
 
-const users_PUT = (req, res = response) => {
-    const {id} = req.params
+
+	const {name, email, password, role} = req.body;
+	const user = new User({name, email, password, role});
+
+	//crypt password
+
+	const salt = bcryptjs.genSaltSync(10);
+	user.password = bcryptjs.hashSync(password, salt);
+
+	await user.save();
 	res.json({
-		msj: 'PUT api - controlador',
-        id
+		user,
 	});
 };
 
-const users_PATCH = (req, res = response) => {
+const updateUser = async (req, res = response) => {
+	const {id} = req.params;
+	const { _id, password, google, email, ...rest} = req.body;
+	//TODO: validar id contra base de datos
+
+	if (password) {
+		const salt = bcryptjs.genSaltSync(10);
+		rest.password = bcryptjs.hashSync(password, salt);
+	}
+	const user = await User.findByIdAndUpdate(id, rest);
 	res.json({
-		msj: 'PATCH api - controlador',
+		user,
 	});
 };
 
-const users_DELETE = (req, res = response) => {
-	res.json({
-		msj: 'DELETE api - controlador',
-	});
+const disableUser = async(req, res = response) => {
+	const {id} = req.params
+	const userDeleted = await User.findByIdAndUpdate(id, {status: false})
+	res.json(userDeleted);
+};
+
+const deleteUser = async(req, res = response) => {
+	const {id} = req.params
+	const userDeleted = await User.findByIdAndDelete(id)
+	res.json(userDeleted);
 };
 
 module.exports = {
-	users_GET,
-	users_POST,
-	users_PATCH,
-	users_DELETE,
-	users_PUT,
+	getUsers,
+	createUser,
+	disableUser,
+	deleteUser,
+	updateUser,
 };
